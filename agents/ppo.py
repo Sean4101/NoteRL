@@ -102,6 +102,20 @@ class PPOAgent:
         self.n_epochs = n_epochs
         self.N = N
         self.device = device if device else torch.device('cpu')
+        self._config = {
+            'n_observations': n_observations,
+            'n_actions': n_actions,
+            'n_notes': n_notes,
+            'hidden_size': hidden_size,
+            'lr': lr,
+            'gamma': gamma,
+            'gae_lambda': gae_lambda,
+            'clip_epsilon': clip_epsilon,
+            'n_epochs': n_epochs,
+            'batch_size': batch_size,
+            'N': N,
+            'write_gate': write_gate,
+        }
 
         self.actor = ActorNetwork(n_observations, n_actions, n_notes=n_notes, hidden_size=hidden_size, write_gate=write_gate).to(self.device)
         self.critic = CriticNetwork(n_observations, n_notes=n_notes, hidden_size=hidden_size).to(self.device)
@@ -278,6 +292,7 @@ class PPOAgent:
 
     def save_model(self, filepath):
         torch.save({
+            'config': self._config,
             'actor_state_dict': self.actor.state_dict(),
             'critic_state_dict': self.critic.state_dict(),
             'actor_optimizer_state_dict': self.actor_optimizer.state_dict(),
@@ -286,11 +301,26 @@ class PPOAgent:
         }, filepath)
         print(f'Model saved to: {filepath}')
 
+    # Deprecated: Use from_checkpoint() instead for loading with config
     def load_model(self, filepath):
-        checkpoint = torch.load(filepath)
+        checkpoint = torch.load(filepath, weights_only=False)
         self.actor.load_state_dict(checkpoint['actor_state_dict'])
         self.critic.load_state_dict(checkpoint['critic_state_dict'])
         self.actor_optimizer.load_state_dict(checkpoint['actor_optimizer_state_dict'])
         self.critic_optimizer.load_state_dict(checkpoint['critic_optimizer_state_dict'])
         self.episode_durations = checkpoint['episode_durations']
         print(f'Model loaded from: {filepath}')
+
+    @classmethod
+    def from_checkpoint(cls, filepath, device=None):
+        checkpoint = torch.load(filepath, map_location=device, weights_only=False)
+        if 'config' not in checkpoint:
+            raise ValueError(f"Checkpoint '{filepath}' has no config. Use load_model() with a manually constructed agent instead.")
+        agent = cls(**checkpoint['config'], device=device)
+        agent.actor.load_state_dict(checkpoint['actor_state_dict'])
+        agent.critic.load_state_dict(checkpoint['critic_state_dict'])
+        agent.actor_optimizer.load_state_dict(checkpoint['actor_optimizer_state_dict'])
+        agent.critic_optimizer.load_state_dict(checkpoint['critic_optimizer_state_dict'])
+        agent.episode_durations = checkpoint['episode_durations']
+        print(f'Model loaded from: {filepath}')
+        return agent

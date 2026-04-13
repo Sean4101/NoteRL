@@ -1,10 +1,14 @@
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import gymnasium as gym
 import torch
 import time
-from reinforce import REINFORCEAgent
-from ppo import PPOAgent
+from agents.reinforce import REINFORCEAgent
+from agents.ppo import PPOAgent
 
-from partial_obs_cartpole import make_partial_obs_cartpole
+from envs.partial_obs_cartpole import make_partial_obs_cartpole
 
 
 #env = gym.make("CartPole-v1")

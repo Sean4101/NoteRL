@@ -35,6 +35,14 @@ class REINFORCEAgent:
         self.n_notes = n_notes
         self.gamma = gamma
         self.device = device if device else torch.device("cpu")
+        self._config = {
+            'n_observations': n_observations,
+            'n_actions': n_actions,
+            'n_notes': n_notes,
+            'hidden_size': hidden_size,
+            'lr': lr,
+            'gamma': gamma,
+        }
         
         self.policy_network = PolicyNetwork(
             n_observations,
@@ -163,15 +171,29 @@ class REINFORCEAgent:
     
     def save_model(self, filepath):
         torch.save({
+            'config': self._config,
             'policy_net_state_dict': self.policy_network.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict(),
             'episode_durations': self.episode_durations,
         }, filepath)
         print(f'Model saved to: {filepath}')
-    
+
+    # Deprecated: Use from_checkpoint() instead for loading with config
     def load_model(self, filepath):
-        checkpoint = torch.load(filepath)
+        checkpoint = torch.load(filepath, weights_only=False)
         self.policy_network.load_state_dict(checkpoint['policy_net_state_dict'])
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         self.episode_durations = checkpoint['episode_durations']
         print(f'Model loaded from: {filepath}')
+
+    @classmethod
+    def from_checkpoint(cls, filepath, device=None):
+        checkpoint = torch.load(filepath, map_location=device, weights_only=False)
+        if 'config' not in checkpoint:
+            raise ValueError(f"Checkpoint '{filepath}' has no config. Use load_model() with a manually constructed agent instead.")
+        agent = cls(**checkpoint['config'], device=device)
+        agent.policy_network.load_state_dict(checkpoint['policy_net_state_dict'])
+        agent.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        agent.episode_durations = checkpoint['episode_durations']
+        print(f'Model loaded from: {filepath}')
+        return agent
