@@ -22,8 +22,8 @@ NoteRL/
 │   ├── reinforce_classic.yaml
 │   └── reinforce_note.yaml
 ├── scripts/
-│   ├── train.py            # Main training script
-│   └── (evaluation script)
+│   ├── train.py            # Training script
+│   └── play.py             # Evaluation / playback script
 └── models/                 # Saved checkpoints
 ```
 
@@ -67,6 +67,19 @@ python scripts/train.py --config configs/ppo_note.yaml --save models/ppo_note.pt
 Copy any existing config and edit `agent_params`. The `env` field accepts:
 - `CartPole-v1-partial` — cart position + pole angle only (POMDP)
 - `CartPole-v1` — full observations
+
+## Playing
+
+```bash
+python scripts/play.py --model models/ppo_note.pth --env CartPole-v1-partial
+```
+
+| Argument | Required | Description |
+|---|---|---|
+| `--model` | Yes | Path to a trained checkpoint (`.pth`) |
+| `--env` | Yes | Environment name: `CartPole-v1` or `CartPole-v1-partial` |
+| `--n_episodes` | No | Number of episodes to run (default: 10) |
+| `--no_render` | No | Disable the renderer (faster evaluation) |
 
 ## Loading a trained model
 

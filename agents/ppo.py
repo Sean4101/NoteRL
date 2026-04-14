@@ -292,6 +292,7 @@ class PPOAgent:
 
     def save_model(self, filepath):
         torch.save({
+            'agent': 'ppo',
             'config': self._config,
             'actor_state_dict': self.actor.state_dict(),
             'critic_state_dict': self.critic.state_dict(),

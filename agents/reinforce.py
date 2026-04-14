@@ -171,6 +171,7 @@ class REINFORCEAgent:
     
     def save_model(self, filepath):
         torch.save({
+            'agent': 'reinforce',
             'config': self._config,
             'policy_net_state_dict': self.policy_network.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict(),
