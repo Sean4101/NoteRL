@@ -49,18 +49,18 @@ class MemoryBuffer:
         self.dones = []
 
 class ActorNetwork(nn.Module):
-    def __init__(self, n_observations, n_actions, n_notes=None, hidden_size=256, write_gate=False):
+    def __init__(self, n_observations, n_actions, n_notes=None, hidden_size=256, write_gate=None):
         super(ActorNetwork, self).__init__()
         input_size = n_observations if n_notes is None else n_observations + n_notes
         self.n_notes = n_notes
-        self.write_gate = write_gate and (n_notes is not None)
+        self.write_gate = write_gate if n_notes is not None else None
 
         self.fc1 = nn.Linear(input_size, hidden_size)
         self.fc2 = nn.Linear(hidden_size, hidden_size)
         self.fc3 = nn.Linear(hidden_size, n_actions)
         if n_notes is not None:
             self.fc_note = nn.Linear(hidden_size, n_notes)
-        if self.write_gate:
+        if self.write_gate is not None:
             self.fc_gate = nn.Linear(hidden_size, n_notes)
 
     def forward(self, x):
@@ -70,7 +70,7 @@ class ActorNetwork(nn.Module):
         if self.n_notes is None:
             return Categorical(action_probs)
         note_values = self.fc_note(x)
-        if self.write_gate:
+        if self.write_gate is not None:
             gate_probs = torch.sigmoid(self.fc_gate(x))
             return Categorical(action_probs), note_values, gate_probs
         return Categorical(action_probs), note_values
@@ -93,9 +93,9 @@ class CriticNetwork(nn.Module):
 class PPOAgent:
     def __init__(self, n_observations, n_actions, n_notes=None, hidden_size=256, lr=3e-4, gamma=0.99,
                  gae_lambda=0.95, clip_epsilon=0.2, n_epochs=10, batch_size=64, N=2048,
-                 write_gate=False, device=None):
+                 write_gate=None, device=None):
         self.n_notes = n_notes
-        self.write_gate = write_gate and (n_notes is not None)
+        self.write_gate = write_gate if n_notes is not None else None
         self.gamma = gamma
         self.gae_lambda = gae_lambda
         self.clip_epsilon = clip_epsilon
@@ -131,10 +131,13 @@ class PPOAgent:
         new_note_np = new_note.detach().cpu().numpy().flatten()
         if gate_probs is None:
             self.note_array = new_note_np
-        else:
+        elif self.write_gate == 'overwrite':
             gate_np = gate_probs.detach().cpu().numpy().flatten()
             mask = np.random.rand(self.n_notes) < gate_np
             self.note_array = np.where(mask, new_note_np, self.note_array)
+        elif self.write_gate == 'blend':
+            gate_np = gate_probs.detach().cpu().numpy().flatten()
+            self.note_array = gate_np * new_note_np + (1 - gate_np) * self.note_array
 
     def choose_action(self, observation):
         obs = torch.tensor(observation, dtype=torch.float).to(self.device)
@@ -146,7 +149,7 @@ class PPOAgent:
             obs_with_notes = torch.cat((obs, torch.from_numpy(self.note_array).float().to(self.device)), dim=0)
             actor_out = self.actor(obs_with_notes)
             dist, new_note = actor_out[0], actor_out[1]
-            gate_probs = actor_out[2] if self.write_gate else None
+            gate_probs = actor_out[2] if self.write_gate is not None else None
             self._apply_note_update(new_note, gate_probs)
             value = self.critic(obs_with_notes)
             obs_input_np = obs_with_notes.cpu().numpy()
@@ -281,7 +284,7 @@ class PPOAgent:
                 obs = torch.cat((obs, notes), dim=1)
                 actor_out = self.actor(obs)
                 new_note = actor_out[1]
-                gate_probs = actor_out[2] if self.write_gate else None
+                gate_probs = actor_out[2] if self.write_gate is not None else None
                 self._apply_note_update(new_note, gate_probs)
             else:
                 actor_out = self.actor(obs)
