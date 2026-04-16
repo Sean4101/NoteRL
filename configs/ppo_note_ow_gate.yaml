@@ -3,8 +3,8 @@ env: CartPole-v1-partial   # CartPole-v1 | CartPole-v1-partial
 agent: ppo
 
 agent_params:
-  n_notes: null
-  write_gate: null
+  n_notes: 4
+  write_gate: overwrite
   hidden_size: 64
   lr: 0.0003
   gamma: 0.99

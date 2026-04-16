@@ -4,7 +4,7 @@ agent: ppo
 
 agent_params:
   n_notes: 4
-  write_gate: true
+  write_gate: blend
   hidden_size: 64
   lr: 0.0003
   gamma: 0.99
@@ -13,4 +13,3 @@ agent_params:
   n_epochs: 10
   batch_size: 64
   N: 1024
-

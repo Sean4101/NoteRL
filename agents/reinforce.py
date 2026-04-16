@@ -116,6 +116,9 @@ class REINFORCEAgent:
             self.optimizer.step()
             
             self.episode_durations.append(t + 1)
+            if (i_episode + 1) % 100 == 0:
+                avg = np.mean(self.episode_durations[-100:])
+                print(f"Episode {i_episode + 1}/{n_training_episodes}  |  Avg reward (last 100): {avg:.1f}")
             if plot_results:
                 self.plot_durations()
 
