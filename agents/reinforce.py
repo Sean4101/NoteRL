@@ -57,7 +57,7 @@ class REINFORCEAgent:
             self.note_array = np.zeros((n_notes), dtype=np.float32)
         
         # Training tracking
-        self.episode_durations = []
+        self.episode_rewards = []
     
     def act(self, state):
         state_tensor = torch.from_numpy(state).float().unsqueeze(0).to(self.device)
@@ -115,22 +115,22 @@ class REINFORCEAgent:
             policy_loss.backward()
             self.optimizer.step()
             
-            self.episode_durations.append(t + 1)
+            self.episode_rewards.append(sum(rewards))
             if (i_episode + 1) % 100 == 0:
-                avg = np.mean(self.episode_durations[-100:])
+                avg = np.mean(self.episode_rewards[-100:])
                 print(f"Episode {i_episode + 1}/{n_training_episodes}  |  Avg reward (last 100): {avg:.1f}")
             if plot_results:
-                self.plot_durations()
+                self.plot_rewards()
 
         print('Training Complete')
         if plot_results:
-            self.plot_durations(show_result=True)
+            self.plot_rewards(show_result=True)
             plt.ioff()
             plt.show()
     
-    def plot_durations(self, show_result=False):
+    def plot_rewards(self, show_result=False):
         plt.figure(1)
-        durations_t = torch.tensor(self.episode_durations, dtype=torch.float)
+        rewards_t = torch.tensor(self.episode_rewards, dtype=torch.float)
         
         if show_result:
             plt.title('Result')
@@ -139,11 +139,11 @@ class REINFORCEAgent:
             plt.title('Training...')
         
         plt.xlabel('Episode')
-        plt.ylabel('Duration')
-        plt.plot(durations_t.numpy())
+        plt.ylabel('Reward')
+        plt.plot(rewards_t.numpy(), alpha=0.3)
         
-        if len(durations_t) >= 1000:
-            means = durations_t.unfold(0, 1000, 1).mean(1).view(-1)
+        if len(rewards_t) >= 1000:
+            means = rewards_t.unfold(0, 1000, 1).mean(1).view(-1)
             means = torch.cat((torch.zeros(999), means))
             plt.plot(means.numpy())
 
@@ -178,7 +178,7 @@ class REINFORCEAgent:
             'config': self._config,
             'policy_net_state_dict': self.policy_network.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict(),
-            'episode_durations': self.episode_durations,
+            'episode_rewards': self.episode_rewards,
         }, filepath)
         print(f'Model saved to: {filepath}')
 
@@ -187,7 +187,7 @@ class REINFORCEAgent:
         checkpoint = torch.load(filepath, weights_only=False)
         self.policy_network.load_state_dict(checkpoint['policy_net_state_dict'])
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        self.episode_durations = checkpoint['episode_durations']
+        self.episode_rewards = checkpoint['episode_rewards']
         print(f'Model loaded from: {filepath}')
 
     @classmethod
@@ -198,6 +198,6 @@ class REINFORCEAgent:
         agent = cls(**checkpoint['config'], device=device)
         agent.policy_network.load_state_dict(checkpoint['policy_net_state_dict'])
         agent.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        agent.episode_durations = checkpoint['episode_durations']
+        agent.episode_rewards = checkpoint['episode_rewards']
         print(f'Model loaded from: {filepath}')
         return agent

@@ -93,7 +93,7 @@ class CriticNetwork(nn.Module):
 class PPOAgent:
     def __init__(self, n_observations, n_actions, n_notes=None, hidden_size=256, lr=3e-4, gamma=0.99,
                  gae_lambda=0.95, clip_epsilon=0.2, n_epochs=10, batch_size=64, N=2048,
-                 write_gate=None, device=None):
+                 write_gate=None, entropy_coef=0.01, device=None):
         self.n_notes = n_notes
         self.write_gate = write_gate if n_notes is not None else None
         self.gamma = gamma
@@ -101,6 +101,7 @@ class PPOAgent:
         self.clip_epsilon = clip_epsilon
         self.n_epochs = n_epochs
         self.N = N
+        self.entropy_coef = entropy_coef
         self.device = device if device else torch.device('cpu')
         self._config = {
             'n_observations': n_observations,
@@ -115,6 +116,7 @@ class PPOAgent:
             'batch_size': batch_size,
             'N': N,
             'write_gate': write_gate,
+            'entropy_coef': entropy_coef,
         }
 
         self.actor = ActorNetwork(n_observations, n_actions, n_notes=n_notes, hidden_size=hidden_size, write_gate=write_gate).to(self.device)
@@ -125,7 +127,7 @@ class PPOAgent:
             self.note_array = np.zeros((n_notes), dtype=np.float32)
 
         self.memory = MemoryBuffer(batch_size)
-        self.episode_durations = []
+        self.episode_rewards = []
 
     def _apply_note_update(self, new_note, gate_probs=None):
         new_note_np = new_note.detach().cpu().numpy().flatten()
@@ -198,7 +200,8 @@ class PPOAgent:
                 returns = advantages[batch] + values_t[batch]
                 critic_loss = ((returns - critic_value) ** 2).mean()
 
-                total_loss = actor_loss + 0.5 * critic_loss
+                entropy_loss = -self.entropy_coef * dist.entropy().mean()
+                total_loss = actor_loss + 0.5 * critic_loss + entropy_loss
 
                 self.actor_optimizer.zero_grad()
                 self.critic_optimizer.zero_grad()
@@ -218,6 +221,7 @@ class PPOAgent:
                 self.note_array = np.zeros(self.n_notes, dtype=np.float32)
             done = False
             t = 0
+            episode_reward = 0
 
             for t in range(max_t):
                 action, log_prob, value, obs_input = self.choose_action(observation)
@@ -226,6 +230,7 @@ class PPOAgent:
 
                 self.memory.store_memory(obs_input, log_prob, action, value, reward, done)
                 n_steps += 1
+                episode_reward += reward
                 observation = observation_
 
                 if n_steps % self.N == 0:
@@ -234,22 +239,22 @@ class PPOAgent:
                 if done:
                     break
 
-            self.episode_durations.append(t + 1)
+            self.episode_rewards.append(episode_reward)
             if (i_episode + 1) % 100 == 0:
-                avg = np.mean(self.episode_durations[-100:])
+                avg = np.mean(self.episode_rewards[-100:])
                 print(f"Episode {i_episode + 1}/{n_training_episodes}  |  Avg reward (last 100): {avg:.1f}")
             if plot_results:
-                self.plot_durations()
+                self.plot_rewards()
 
         print('Training Complete')
         if plot_results:
-            self.plot_durations(show_result=True)
+            self.plot_rewards(show_result=True)
             plt.ioff()
             plt.show()
 
-    def plot_durations(self, show_result=False):
+    def plot_rewards(self, show_result=False):
         plt.figure(1)
-        durations_t = torch.tensor(self.episode_durations, dtype=torch.float)
+        rewards_t = torch.tensor(self.episode_rewards, dtype=torch.float)
 
         if show_result:
             plt.title('Result')
@@ -258,11 +263,11 @@ class PPOAgent:
             plt.title('Training...')
 
         plt.xlabel('Episode')
-        plt.ylabel('Duration')
-        plt.plot(durations_t.numpy())
+        plt.ylabel('Reward')
+        plt.plot(rewards_t.numpy(), alpha=0.3)
 
-        if len(durations_t) >= 100:
-            means = durations_t.unfold(0, 100, 1).mean(1).view(-1)
+        if len(rewards_t) >= 100:
+            means = rewards_t.unfold(0, 100, 1).mean(1).view(-1)
             means = torch.cat((torch.zeros(99), means))
             plt.plot(means.numpy())
 
@@ -304,7 +309,7 @@ class PPOAgent:
             'critic_state_dict': self.critic.state_dict(),
             'actor_optimizer_state_dict': self.actor_optimizer.state_dict(),
             'critic_optimizer_state_dict': self.critic_optimizer.state_dict(),
-            'episode_durations': self.episode_durations,
+            'episode_rewards': self.episode_rewards,
         }, filepath)
         print(f'Model saved to: {filepath}')
 
@@ -315,7 +320,7 @@ class PPOAgent:
         self.critic.load_state_dict(checkpoint['critic_state_dict'])
         self.actor_optimizer.load_state_dict(checkpoint['actor_optimizer_state_dict'])
         self.critic_optimizer.load_state_dict(checkpoint['critic_optimizer_state_dict'])
-        self.episode_durations = checkpoint['episode_durations']
+        self.episode_rewards = checkpoint['episode_rewards']
         print(f'Model loaded from: {filepath}')
 
     @classmethod
@@ -328,6 +333,6 @@ class PPOAgent:
         agent.critic.load_state_dict(checkpoint['critic_state_dict'])
         agent.actor_optimizer.load_state_dict(checkpoint['actor_optimizer_state_dict'])
         agent.critic_optimizer.load_state_dict(checkpoint['critic_optimizer_state_dict'])
-        agent.episode_durations = checkpoint['episode_durations']
+        agent.episode_rewards = checkpoint['episode_rewards']
         print(f'Model loaded from: {filepath}')
         return agent

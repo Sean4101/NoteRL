@@ -9,16 +9,17 @@ import torch
 from agents.ppo import PPOAgent
 from agents.reinforce import REINFORCEAgent
 from envs.partial_obs_cartpole import make_partial_obs_cartpole
+from envs.minigrid_flat import make_minigrid_flat
 
 
 def make_env(env_name):
     if env_name == 'CartPole-v1-partial':
         return make_partial_obs_cartpole()
-    elif env_name == 'CartPole-v1':
-        import gymnasium as gym
-        return gym.make('CartPole-v1')
-    else:
-        raise ValueError(f"Unknown env '{env_name}'. Choose: CartPole-v1, CartPole-v1-partial")
+    try:
+        return make_minigrid_flat(env_name)
+    except Exception as e:
+        print(f"Error creating env '{env_name}': {e}")
+        raise ValueError(f"Unknown env '{env_name}'.")
 
 
 def make_agent(agent_name, agent_params, n_observations, n_actions, device):

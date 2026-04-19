@@ -14,7 +14,8 @@ NoteRL/
 │   ├── ppo.py              # PPO agent (classic, note, gated-note variants)
 │   └── reinforce.py        # REINFORCE agent (classic, note variants)
 ├── envs/
-│   └── partial_obs_cartpole.py   # CartPole with velocity observations hidden
+│   ├── partial_obs_cartpole.py   # CartPole with velocity observations hidden
+│   └── minigrid_flat.py          # Minigrid-Memory with observation simplified
 ├── configs/
 │   ├── ppo_classic.yaml
 │   ├── ppo_note.yaml
