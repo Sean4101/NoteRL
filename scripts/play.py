@@ -9,6 +9,7 @@ import torch
 from agents.ppo import PPOAgent
 from agents.reinforce import REINFORCEAgent
 from envs.partial_obs_cartpole import make_partial_obs_cartpole
+from envs.minigrid_flat import make_minigrid_flat
 
 
 AGENT_CLASSES = {
@@ -20,12 +21,11 @@ AGENT_CLASSES = {
 def make_env(env_name, render_mode):
     if env_name == 'CartPole-v1-partial':
         return make_partial_obs_cartpole(render_mode=render_mode)
-    elif env_name == 'CartPole-v1':
-        import gymnasium as gym
-        return gym.make('CartPole-v1', render_mode=render_mode)
-    else:
+    try:
+        return make_minigrid_flat(env_name, render_mode=render_mode )
+    except Exception as e:
+        print(f"Error creating env '{env_name}': {e}")
         raise ValueError(f"Unknown env '{env_name}'.")
-
 
 def load_agent(model_path, device):
     checkpoint = torch.load(model_path, map_location=device, weights_only=False)
@@ -62,7 +62,7 @@ def run(env, agent, num_episodes):
 
             if done:
                 episode_rewards.append(total_reward)
-                print(f"Episode {episode + 1:>3}: {total_reward:.0f} steps")
+                print(f"Episode {episode + 1:>3}: reward = {total_reward:.0f}")
                 break
 
     print(f"\n{'='*40}")
@@ -76,7 +76,7 @@ def run(env, agent, num_episodes):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', required=True, help='Path to trained model checkpoint (.pth)')
-    parser.add_argument('--env', required=True, help='Environment name: CartPole-v1 | CartPole-v1-partial')
+    parser.add_argument('--env', required=True, help='Environment name (e.g. CartPole-v1, CartPole-v1-partial, MiniGrid-MemoryS7-v0)')
     parser.add_argument('--n_episodes', type=int, default=10, help='Number of episodes to run (default: 10)')
     parser.add_argument('--no_render', action='store_true', help='Disable rendering')
     args = parser.parse_args()
