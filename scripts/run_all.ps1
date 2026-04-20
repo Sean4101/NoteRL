@@ -1,6 +1,6 @@
 param(
-    [int]$Episodes     = 200,
-    [int]$NumAgents    = 2,
+    [int]$Episodes     = 4000,
+    [int]$NumAgents    = 5,
     [int]$EvalEpisodes = 50,
     [string]$PlotsDir  = "plots",
     [switch]$SkipTraining
