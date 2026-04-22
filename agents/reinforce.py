@@ -10,6 +10,12 @@ from torch.distributions import Categorical
 
 
 class PolicyNetwork(nn.Module):
+    """
+    Two-layer MLP policy network with optional note-writing head.
+
+    Returns action_probs alone (classic) or (action_probs, note_values) when notes are enabled.
+    """
+
     def __init__(self, n_observations, n_actions, n_notes=None, hidden_size=64):
         super(PolicyNetwork, self).__init__()
         input_size = n_observations if n_notes is None else n_observations + n_notes
@@ -29,6 +35,15 @@ class PolicyNetwork(nn.Module):
         return action_probs, self.fc_note(x)
 
 class REINFORCEAgent:
+    """
+    REINFORCE (Monte Carlo policy gradient) agent with optional external note memory.
+
+    Args:
+        n_observations: Dimension of the raw environment observation.
+        n_actions:      Number of discrete actions.
+        n_notes:        Size of the note array. None disables note memory.
+    """
+
     def __init__(self, n_observations, n_actions, n_notes=None, hidden_size=64, lr=1e-2, gamma=0.99, device=None):
         self.n_observations = n_observations
         self.n_actions = n_actions
@@ -60,6 +75,7 @@ class REINFORCEAgent:
         self.episode_rewards = []
     
     def act(self, state):
+        """Sample an action during training, returning (action, log_prob) for the policy gradient."""
         state_tensor = torch.from_numpy(state).float().unsqueeze(0).to(self.device)
 
         if self.n_notes is None:
@@ -94,6 +110,7 @@ class REINFORCEAgent:
                 if done:
                     break
 
+            # Compute discounted returns in reverse: G_t = r_t + γ·G_{t+1}
             returns = deque(maxlen=max_t)
             n_steps = len(rewards)
 
@@ -102,7 +119,8 @@ class REINFORCEAgent:
                 returns.appendleft(self.gamma * disc_return_t + rewards[t_return])
 
             eps = np.finfo(np.float32).eps.item()
-            
+
+            # Normalise returns to reduce gradient variance
             returns = torch.tensor(returns)
             returns = (returns - returns.mean()) / (returns.std() + eps)
 

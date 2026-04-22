@@ -79,7 +79,7 @@ python scripts/play.py --model models/cartpole-partial/[model name].pth --env Ca
 `run_all.ps1` trains all configs, evaluates the saved checkpoints, and produces plots in one command:
 
 ```powershell
-.\scripts\run_all.ps1                        # all environments
+.\scripts\run_all.ps1                        # all environments, running this could easily take over 12 hours depending on hardware!
 .\scripts\run_all.ps1 -Env cartpole-partial  # single environment
 .\scripts\run_all.ps1 -SkipTraining          # evaluate + plot only
 ```

@@ -8,6 +8,8 @@ from torch.distributions import Categorical
 
 
 class MemoryBuffer:
+    """Rollout buffer for PPO. Stores transitions until a learning update is triggered."""
+
     def __init__(self, batch_size):
         self.observations = []
         self.log_probs = []
@@ -18,6 +20,7 @@ class MemoryBuffer:
         self.batch_size = batch_size
 
     def generate_batches(self):
+        """Shuffle all stored transitions and split into random mini-batches."""
         n_observations = len(self.observations)
         batch_start = np.arange(0, n_observations, self.batch_size)
         indices = np.arange(n_observations, dtype=np.int64)
@@ -49,6 +52,16 @@ class MemoryBuffer:
         self.dones = []
 
 class ActorNetwork(nn.Module):
+    """
+    Policy network with optional note-writing head.
+
+    Output varies by mode:
+      - Classic (n_notes=None):          Categorical distribution.
+      - Note (write_gate=None):          (Categorical, note_values).
+      - Gated (write_gate='overwrite'
+               or 'blend'):             (Categorical, note_values, gate_probs).
+    """
+
     def __init__(self, n_observations, n_actions, n_notes=None, hidden_size=256, write_gate=None):
         super(ActorNetwork, self).__init__()
         input_size = n_observations if n_notes is None else n_observations + n_notes
@@ -76,6 +89,8 @@ class ActorNetwork(nn.Module):
         return Categorical(action_probs), note_values
         
 class CriticNetwork(nn.Module):
+    """Value network. Accepts observation concatenated with the note array when notes are enabled."""
+
     def __init__(self, n_observations, n_notes=None, hidden_size=256):
         super(CriticNetwork, self).__init__()
         input_size = n_observations if n_notes is None else n_observations + n_notes
@@ -91,6 +106,19 @@ class CriticNetwork(nn.Module):
         return self.critic(observation)
 
 class PPOAgent:
+    """
+    Proximal Policy Optimisation agent with optional external note memory.
+
+    Args:
+        n_observations: Dimension of the raw environment observation.
+        n_actions:      Number of discrete actions.
+        n_notes:        Size of the note array. None disables note memory.
+        N:              Steps collected between learning updates (rollout horizon).
+        write_gate:     Note update rule — None (direct write), 'overwrite' (stochastic
+                        per-element gate), or 'blend' (weighted interpolation).
+        entropy_coef:   Weight of the entropy bonus in the total loss.
+    """
+
     def __init__(self, n_observations, n_actions, n_notes=None, hidden_size=256, lr=3e-4, gamma=0.99,
                  gae_lambda=0.95, clip_epsilon=0.2, n_epochs=10, batch_size=64, N=2048,
                  write_gate=None, entropy_coef=0.01, device=None):
@@ -132,12 +160,15 @@ class PPOAgent:
     def _apply_note_update(self, new_note, gate_probs=None):
         new_note_np = new_note.detach().cpu().numpy().flatten()
         if gate_probs is None:
+            # No gate: overwrite the entire note array directly
             self.note_array = new_note_np
         elif self.write_gate == 'overwrite':
+            # Stochastic gate: each element is overwritten with probability gate_p
             gate_np = gate_probs.detach().cpu().numpy().flatten()
             mask = np.random.rand(self.n_notes) < gate_np
             self.note_array = np.where(mask, new_note_np, self.note_array)
         elif self.write_gate == 'blend':
+            # Soft gate: lerp between old and new value, gate_p controls the mix
             gate_np = gate_probs.detach().cpu().numpy().flatten()
             self.note_array = gate_np * new_note_np + (1 - gate_np) * self.note_array
 
@@ -168,9 +199,12 @@ class PPOAgent:
             observations, actions, old_log_probs, values, rewards, dones, batches = \
                 self.memory.generate_batches()
 
+            # Bootstrap value for the last step is 0 (episode may have ended mid-rollout)
             values = np.append(values, 0)
             advantages = np.zeros(len(rewards), dtype=np.float32)
 
+            # Generalised Advantage Estimation (GAE-λ): accumulate discounted TD errors
+            # A_t = Σ_{k≥t} (γλ)^{k-t} · δ_k,  where δ_k = r_k + γV_{k+1} - V_k
             for t in range(len(rewards) - 1):
                 discount = 1
                 a_t = 0
@@ -192,6 +226,8 @@ class PPOAgent:
                 critic_value = torch.squeeze(self.critic(obs))
 
                 new_log_probs = dist.log_prob(acts)
+                # PPO clipped surrogate: take the pessimistic bound of the unclipped
+                # and clipped importance-weighted advantage estimates
                 prob_ratio = new_log_probs.exp() / batch_log_probs.exp()
                 weighted_probs = advantages[batch] * prob_ratio
                 weighted_clipped_probs = torch.clamp(prob_ratio, 1 - self.clip_epsilon, 1 + self.clip_epsilon) * advantages[batch]
