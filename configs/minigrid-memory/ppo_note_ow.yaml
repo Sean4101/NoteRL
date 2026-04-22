@@ -1,15 +1,16 @@
-env: CartPole-v1-partial   # CartPole-v1 | CartPole-v1-partial
+env: MiniGrid-MemoryS7-v0
 
 agent: ppo
 
 agent_params:
-  n_notes: 4
+  n_notes: 8
   write_gate: overwrite
-  hidden_size: 64
+  hidden_size: 128
   lr: 0.0003
   gamma: 0.99
   gae_lambda: 0.95
   clip_epsilon: 0.1
+  entropy_coef: 0.05
   n_epochs: 10
   batch_size: 64
   N: 1024
