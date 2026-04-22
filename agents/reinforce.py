@@ -161,7 +161,8 @@ class REINFORCEAgent:
         with torch.no_grad():
             if self.n_notes is not None:
                 state_with_notes = torch.cat((state, torch.from_numpy(self.note_array).float().unsqueeze(0).to(self.device)), dim=1)
-                probs, _ = self.policy_network(state_with_notes)
+                probs, note_values = self.policy_network(state_with_notes)
+                self.note_array = note_values.detach().cpu().numpy().flatten()
             else:
                 probs = self.policy_network(state)
             
