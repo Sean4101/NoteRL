@@ -3,6 +3,7 @@ param(
     [int]$NumAgents    = 5,
     [int]$EvalEpisodes = 50,
     [string]$PlotsDir  = "plots",
+    [string]$Env       = "",
     [switch]$SkipTraining
 )
 
@@ -13,7 +14,9 @@ if ($SkipTraining) {
     Write-Host "=== Phase A: Skipping training ==="
 } else {
     Write-Host "=== Phase A: Training ==="
-    & "$Root\scripts\train.ps1" -Episodes $Episodes -NumAgents $NumAgents
+    $TrainArgs = @{ Episodes = $Episodes; NumAgents = $NumAgents }
+    if ($Env) { $TrainArgs['Env'] = $Env }
+    & "$Root\scripts\train.ps1" @TrainArgs
 }
 
 $ModelsRoot = Join-Path $Root "models"
@@ -29,7 +32,11 @@ $AbsPlots = if ([System.IO.Path]::IsPathRooted($PlotsDir)) {
 }
 New-Item -ItemType Directory -Path $AbsPlots -Force | Out-Null
 
-$EnvDirs = Get-ChildItem -Path $ModelsRoot -Directory
+$EnvDirs = if ($Env) {
+    Get-ChildItem -Path $ModelsRoot -Directory | Where-Object { $_.Name -eq $Env }
+} else {
+    Get-ChildItem -Path $ModelsRoot -Directory
+}
 
 # ── Phase B: Evaluate each environment ───────────────────────────────────────
 Write-Host ""

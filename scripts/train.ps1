@@ -1,11 +1,13 @@
 param(
-    [int]$Episodes = 5000,
-    [int]$NumAgents = 3
+    [int]$Episodes = 4000,
+    [int]$NumAgents = 5,
+    [string]$Env = ""
 )
 
 $Root = $PSScriptRoot | Split-Path
 
-$Configs = Get-ChildItem -Path "$Root\configs" -Filter "*.yaml" -Recurse
+$SearchPath = if ($Env) { "$Root\configs\$Env" } else { "$Root\configs" }
+$Configs = Get-ChildItem -Path $SearchPath -Filter "*.yaml" -Recurse
 
 foreach ($ConfigFile in $Configs) {
     $RelConfig = $ConfigFile.FullName.Substring($Root.Length + 1) -replace '\\', '/'
