@@ -11,20 +11,22 @@ Agents produce 2 separate outputs, $A^{(e)}$ for environment action and $A^{(n)}
 ```
 NoteRL/
 ├── agents/
-│   ├── ppo.py              # PPO agent (classic, note, gated-note variants)
+│   ├── ppo.py              # PPO agent (classic, note, blend-gate, overwrite-gate variants)
 │   └── reinforce.py        # REINFORCE agent (classic, note variants)
 ├── envs/
 │   ├── partial_obs_cartpole.py   # CartPole with velocity observations hidden
-│   └── minigrid_flat.py          # Minigrid-Memory with observation simplified
+│   └── minigrid_flat.py          # Minigrid-Memory with flattened & simplified observation
 ├── configs/
-│   ├── ppo_classic.yaml
-│   ├── ppo_note.yaml
-│   ├── ppo_gated.yaml
-│   ├── reinforce_classic.yaml
-│   └── reinforce_note.yaml
+│   ├── cartpole-partial/   # Configs for CartPole-v1-partial
+│   └── minigrid-memory/    # Configs for MiniGrid-MemoryS7-v0
 ├── scripts/
-│   ├── train.py            # Training script
-│   └── play.py             # Evaluation / playback script
+│   ├── train.py            # Train a single agent
+│   ├── train.ps1           # Batch-train all configs (parallel jobs)
+│   ├── evaluate.py         # Evaluate saved model checkpoints
+│   ├── play.py             # Interactive playback of a trained model
+│   ├── plot.py             # Plot training curves
+│   ├── plot_runs.py        # Plot multiple training runs
+│   └── run_all.ps1         # Full pipeline: train → evaluate → plot
 └── models/                 # Saved checkpoints
 ```
 
@@ -43,7 +45,7 @@ pip install -r requirements.txt
 ## Training
 
 ```bash
-python scripts/train.py --config configs/ppo_note.yaml --save models/ppo_note.pth --n_episodes 10000
+python scripts/train.py --config configs/cartpole-partial/ppo_note.yaml --save models/cartpole-partial/[model name].pth --n_episodes 4000
 ```
 
 | Argument | Required | Description |
@@ -52,35 +54,44 @@ python scripts/train.py --config configs/ppo_note.yaml --save models/ppo_note.pt
 | `--save` | Yes | Path to save the trained model |
 | `--n_episodes` | No | Number of training episodes (default: 1000) |
 | `--no_plot` | No | Disable the live training plot |
-
-### Available configs
-
-| Config | Agent | Notes | Write Gate |
-|---|---|---|---|
-| `ppo_classic.yaml` | PPO | — | — |
-| `ppo_note.yaml` | PPO | 4 | No |
-| `ppo_gated.yaml` | PPO | 4 | Yes |
-| `reinforce_classic.yaml` | REINFORCE | — | — |
-| `reinforce_note.yaml` | REINFORCE | 4 | — |
-
 ### Custom config
 
 Copy any existing config and edit `agent_params`. The `env` field accepts:
 - `CartPole-v1-partial` — cart position + pole angle only (POMDP)
 - `CartPole-v1` — full observations
+- Any Minigrid env ID (`MiniGrid-MemoryS7-v0` is the only one tested and used)
 
 ## Playing
 
 ```bash
-python scripts/play.py --model models/ppo_note.pth --env CartPole-v1-partial
+python scripts/play.py --model models/cartpole-partial/[model name].pth --env CartPole-v1-partial
 ```
 
 | Argument | Required | Description |
 |---|---|---|
 | `--model` | Yes | Path to a trained checkpoint (`.pth`) |
-| `--env` | Yes | Environment name: `CartPole-v1` or `CartPole-v1-partial` |
+| `--env` | Yes | Environment name (e.g. `CartPole-v1-partial`, `MiniGrid-MemoryS7-v0`) |
 | `--n_episodes` | No | Number of episodes to run (default: 10) |
 | `--no_render` | No | Disable the renderer (faster evaluation) |
+
+## Full pipeline
+
+`run_all.ps1` trains all configs, evaluates the saved checkpoints, and produces plots in one command:
+
+```powershell
+.\scripts\run_all.ps1                        # all environments, running this could easily take over 12 hours depending on hardware!
+.\scripts\run_all.ps1 -Env cartpole-partial  # single environment
+.\scripts\run_all.ps1 -SkipTraining          # evaluate + plot only
+```
+
+| Parameter | Default | Description |
+|---|---|---|
+| `-Env` | *(all)* | Limit to one environment sub-directory |
+| `-Episodes` | 4000 | Training episodes per run |
+| `-NumAgents` | 5 | Parallel runs per config |
+| `-EvalEpisodes` | 50 | Evaluation episodes per saved model |
+| `-PlotsDir` | `plots` | Output directory for plots and eval results |
+| `-SkipTraining` | false | Skip Phase A and go straight to evaluate + plot |
 
 ## Loading a trained model
 
