@@ -102,4 +102,18 @@ from agents.ppo import PPOAgent
 
 agent = PPOAgent.from_checkpoint('models/ppo_note.pth', device='cpu')
 ```
-
+## Results
+### CartPole-v1-partial
+![CartPole-v1-partial training curves](assets/cartpole-partial.png)
+**Final Evaluation**
+| Metric | Classic REINFORCE | REINFORCE with Note | Classic PPO | PPO with Note | PPO with Note + Blend | PPO with Note + Overwrite |
+| --- | --- | --- | --- | --- | --- | --- |
+| **Mean** | 40.92 | 95.11 | 42.91 | 149.14 | 303.73 | 168.29 |
+| **Std** | 2.25 | 67.76 | 0.98 | 78.48 | 237.43 | 40.36 |
+### MiniGrid-MemoryS7-v0
+![MiniGrid-MemoryS7-v0 training curves](assets/minigrid-memory.png)
+**Final Evaluation**
+| Metric | Classic PPO | PPO with Note | PPO with Note + Blend | PPO with Note + Overwrite |
+| --- | --- | --- | --- | --- |
+| **Mean** | 0.3460 | 0.3688 | 0.3149 | 0.2951 |
+| **Std** | 0.2471 | 0.2195 | 0.1850 | 0.1954 |
